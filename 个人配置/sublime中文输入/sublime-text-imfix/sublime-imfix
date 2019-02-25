@@ -1,0 +1,174 @@
+#!/bin/bash
+
+echo "Ensure apt is set up to work with https sources and install dependencies ..........."
+sudo apt-get update >> /dev/null
+sudo apt-get install -y wget apt-transport-https software-properties-common build-essential libgtk2.0-dev >> /dev/null
+
+echo "Checking for installation of Sublime Text 3..........."
+if which subl3
+then
+echo ".............................................Installed"
+else
+  echo "It seems you do not install Sublime Text 3 in your system."
+  echo -n 'Do you want to install it? [Y/N]: '
+
+  read sublime_input
+
+  if [ $sublime_input == 'Y' ] || [ $sublime_input == 'y' ]
+  then
+    echo ''
+    echo '*********** Adding Sublime Text 3 PPA **********************'
+    echo ''
+    wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
+    echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list
+
+    echo ''
+    echo '*********** Updating system ********************************'
+    echo ''
+    sudo apt-get update >> /dev/null
+
+    echo ''
+    echo '*********** Installing Sublime Text 3 **********************'
+    echo ''
+    sudo apt-get install -y sublime-text >> /dev/null
+
+    echo ''
+    echo '*********** Sublime Text 3 installed successfully **********'
+  else
+    echo ''
+    echo '*********** Skip installing Sublime Text 3 *****************'
+  fi
+fi
+
+echo ''
+echo "Checking for installation of Fcitx Input Methods...."
+
+if which fcitx
+then
+  echo "...........................................Installed"
+else
+  echo "It seems that you do not install Fcitx Input Method in your system."
+  echo -n 'Do you want to install it? [Y/N]: '
+
+  read fcitx_input
+
+  if [ $fcitx_input == 'Y' ] || [ $fcitx_input == 'y' ]
+  then
+    echo ''
+    echo '*********** Installing Fcitx and Pinyin methods ************'
+    echo ''
+    sudo apt install -y fcitx-bin fcitx-googlepinyin fcitx-table >> /dev/null
+
+    if ! which fcitx
+    then
+      echo ''
+      echo '*********** Trying the old way to install Fcitx ************'
+      echo ''
+      echo '*********** Adding Fcitx PPA *******************************'
+      echo ''
+      sudo add-apt-repository -y ppa:fcitx-team/nightly
+
+      echo ''
+      echo '*********** Updating system ********************************'
+      echo ''
+      sudo apt-get update >> /dev/null
+
+      echo ''
+      echo '*********** Installing Fcitx and Pinyin methods ************'
+      echo ''
+      sudo apt-get install -y fcitx fcitx-config-gtk fcitx-sunpinyin fcitx-googlepinyin fcitx-module-cloudpinyin >> /dev/null
+
+      echo ''
+      echo '*********** Installing Fcitx related libs ******************'
+      echo ''
+      sudo apt-get install -y fcitx-table-all >> /dev/null
+    fi
+
+    if which fcitx
+    then
+      echo ''
+      echo '*********** Fcitx installed successfully! *******************'
+      echo ''
+      echo '*********** Setting Fcitx as the default input method! ******'
+      if which im-switch
+      then
+        im-switch -s fcitx -z default
+      else
+        if which im-config
+        then
+          im-config -n fctix
+        fi
+      fi
+    else
+      echo '*********** Fcitx installed failed! *******************'
+      echo ''
+    fi
+  else
+    echo ''
+    echo '*********** Skip installing Sublime Text 3 *****************'
+  fi
+fi
+
+if which subl3 && which fcitx
+then
+  echo ''
+  echo '*********** Adding shared lib to sublime directory ***********'
+  echo ''
+  echo '*********** Checking for existing file ***********************'
+  if [ -e '/opt/sublime_text_3/libsublime-imfix.so' ]
+    then
+    echo ''
+    echo '*********** replacing libsublime-imfix.so with new one *******'
+    sudo rm /opt/sublime_text_3/libsublime-imfix.so
+    if [ `getconf LONG_BIT` -eq 32 ];then
+        sudo cp ./lib/libsublime-imfix-32bits.so /opt/sublime_text_3/libsublime-imfix.so
+    else
+        sudo cp ./lib/libsublime-imfix.so /opt/sublime_text_3/
+    fi
+  elif [ `getconf LONG_BIT` -eq 32 ];then
+    sudo cp ./lib/libsublime-imfix-32bits.so /opt/sublime_text_3/libsublime-imfix.so
+  else
+    sudo cp ./lib/libsublime-imfix.so /opt/sublime_text_3/
+  fi
+
+  echo ''
+  echo '*********** Replacing subl with new one **********************'
+  echo ''
+  if [ -e '/usr/bin/subl3' ]
+    then
+    sudo rm /usr/bin/subl3
+  fi
+  sudo cp ./src/subl3 /usr/bin/
+
+  echo '*********** Replacing sublime-text.desktop with new one ******'
+  for file in /usr/share/applications/sublime{-,_}text.desktop; do
+    if [ -e $file ]
+      then
+      sudo rm $file && sudo cp ./src/sublime-text.desktop /usr/share/applications/
+      sudo chmod 644 /usr/share/applications/sublime-text.desktop
+      break
+    fi
+  done
+
+  echo ''
+  echo '*********** Sublime Text input method problem fixed! *********'
+  echo ''
+  echo '*********** More: Installing extra skins *********************'
+  echo ''
+  echo '*********** Unpacking skin into current directory ************'
+  echo ''
+  tar -zxvf src/anran.tar.gz
+
+  echo '** Copying skin to Fcitx skin directory: /usr/share/fcitx/skin **'
+  echo ''
+  sudo cp -r anran /usr/share/fcitx/skin/
+  rm -r anran
+
+  echo 'Done!'
+  echo ''
+  echo 'Thanks for using this script to fix CJK Input Method problem of SublimeText 2/3.'
+  echo ''
+  echo 'Re-login your X windows and start to use SublimeText 2/3 with Fcitx!'
+else
+  echo -e '\033[31mSublimeText 2/3 or Fcitx is not installed on your system, please recheck!\033[39m'
+fi
